@@ -12,7 +12,8 @@ const staticFiles = new Map([
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/supabase-client.js', ['supabase-client.js', 'text/javascript; charset=utf-8']],
   ['/node_modules/@supabase/supabase-js/dist/umd/supabase.js', ['node_modules/@supabase/supabase-js/dist/umd/supabase.js', 'text/javascript; charset=utf-8']],
-  ['/node_modules/xlsx/dist/xlsx.full.min.js', ['node_modules/xlsx/dist/xlsx.full.min.js', 'text/javascript; charset=utf-8']]
+  ['/node_modules/read-excel-file/bundle/read-excel-file.min.js', ['node_modules/read-excel-file/bundle/read-excel-file.min.js', 'text/javascript; charset=utf-8']],
+  ['/node_modules/write-excel-file/bundle/write-excel-file.min.js', ['node_modules/write-excel-file/bundle/write-excel-file.min.js', 'text/javascript; charset=utf-8']]
 ]);
 
 let staticServer;

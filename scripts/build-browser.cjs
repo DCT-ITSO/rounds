@@ -61,8 +61,12 @@ const vendors = [
     path.join(output, 'vendor', 'supabase.js')
   ],
   [
-    path.join(root, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'),
-    path.join(output, 'vendor', 'xlsx.full.min.js')
+    path.join(root, 'node_modules', 'read-excel-file', 'bundle', 'read-excel-file.min.js'),
+    path.join(output, 'vendor', 'read-excel-file.min.js')
+  ],
+  [
+    path.join(root, 'node_modules', 'write-excel-file', 'bundle', 'write-excel-file.min.js'),
+    path.join(output, 'vendor', 'write-excel-file.min.js')
   ]
 ];
 for (const [source] of vendors) {
@@ -92,9 +96,15 @@ html = replaceOnce(
 );
 html = replaceOnce(
   html,
-  '<script defer src="./node_modules/xlsx/dist/xlsx.full.min.js"></script>',
-  '<script defer src="./vendor/xlsx.full.min.js"></script>',
-  'XLSX SDK'
+  '<script defer src="./node_modules/read-excel-file/bundle/read-excel-file.min.js"></script>',
+  '<script defer src="./vendor/read-excel-file.min.js"></script>',
+  'XLSX reader'
+);
+html = replaceOnce(
+  html,
+  '<script defer src="./node_modules/write-excel-file/bundle/write-excel-file.min.js"></script>',
+  '<script defer src="./vendor/write-excel-file.min.js"></script>',
+  'XLSX writer'
 );
 html = replaceOnce(
   html,

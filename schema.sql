@@ -451,6 +451,10 @@ begin
     raise exception 'An active Rounds account is required.' using errcode = '42501';
   end if;
 
+  if p_date is distinct from (pg_catalog.now() at time zone 'Asia/Manila')::date then
+    raise exception 'Rounds can only be generated for today.' using errcode = '22023';
+  end if;
+
   with ordered_schedules as (
     select
       s.*,

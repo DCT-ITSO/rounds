@@ -4,7 +4,7 @@
 
 ## Platform
 
-Electron desktop client first; a responsive phone client will be added separately.
+Electron desktop client with a responsive browser build and Android wrapper from the shared UI.
 
 ## Stack
 
@@ -35,7 +35,7 @@ IT Staff move between rooms in one or more buildings and may use phones while wa
 - A new scheduled instructor in a room can create a check task. Consecutive sessions with the same instructor need not create a new handoff task.
 - IT Staff can claim a task, record PC and laptop/HDMI use, report display condition, add notes, and attach an optional photo. The Activity page exposes the latest 100 completed checks. A round is flagged when the PC is not in use, a personal laptop is connected by HDMI, or the display needs attention.
 - Updates are shared across accounts. Room selection is done in the app; QR codes are not required.
-- Electron is the first packaged client for desktop use. It does not run on phones; mobile access remains a required follow-on client using the same Supabase project.
+- Electron is the packaged desktop client. The responsive browser build can be hosted on GitHub Pages, and the Android wrapper uses the same Supabase project and UI.
 - Admins can edit, pause, and resume recurring schedule entries. A one-day cancellation, substitution, or room change is not implemented; edits affect the recurring entry.
 - A check becomes overdue 25 minutes after its scheduled start if no one completes it. This is a prototype default, not a campus policy.
 - The local Node.js/JSON preview remains available, while the Electron client uses the configured Supabase project after its one-time SQL migration and Edge Function setup. School scheduling integration and push notification delivery remain out of scope for the first version.

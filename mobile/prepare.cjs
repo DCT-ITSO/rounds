@@ -15,10 +15,23 @@ function readEnv(file) {
 }
 
 const env = readEnv(path.join(root, '.env'));
-const supabaseUrl = env.ROUNDS_SUPABASE_URL || process.env.ROUNDS_SUPABASE_URL || '';
-const publishableKey = env.ROUNDS_SUPABASE_PUBLISHABLE_KEY || process.env.ROUNDS_SUPABASE_PUBLISHABLE_KEY || '';
+const supabaseUrl = process.env.ROUNDS_SUPABASE_URL || env.ROUNDS_SUPABASE_URL || '';
+const publishableKey = process.env.ROUNDS_SUPABASE_PUBLISHABLE_KEY || env.ROUNDS_SUPABASE_PUBLISHABLE_KEY || '';
 if (!supabaseUrl || !publishableKey) {
   throw new Error('Set ROUNDS_SUPABASE_URL and ROUNDS_SUPABASE_PUBLISHABLE_KEY in .env before building the Android app.');
+}
+if (/^sb_secret_/i.test(publishableKey)) {
+  throw new Error('A Supabase secret key cannot be included in an Android app. Use the publishable key.');
+}
+const keyPayload = publishableKey.split('.')[1];
+if (keyPayload) {
+  try {
+    if (JSON.parse(Buffer.from(keyPayload, 'base64url').toString('utf8')).role === 'service_role') {
+      throw new Error('A Supabase service-role key cannot be included in an Android app. Use the publishable key.');
+    }
+  } catch (error) {
+    if (/service-role key/.test(error.message)) throw error;
+  }
 }
 
 fs.rmSync(webDir, { recursive: true, force: true });
@@ -28,10 +41,12 @@ for (const name of ['index.html', 'app.js', 'theme-init.js', 'styles.css', 'supa
 }
 
 const supabaseBundle = path.join(root, 'node_modules', '@supabase', 'supabase-js', 'dist', 'umd', 'supabase.js');
-const xlsxBundle = path.join(root, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js');
+const readExcelBundle = path.join(root, 'node_modules', 'read-excel-file', 'bundle', 'read-excel-file.min.js');
+const writeExcelBundle = path.join(root, 'node_modules', 'write-excel-file', 'bundle', 'write-excel-file.min.js');
 for (const [source, destination] of [
   [supabaseBundle, path.join(webDir, 'node_modules', '@supabase', 'supabase-js', 'dist', 'umd', 'supabase.js')],
-  [xlsxBundle, path.join(webDir, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js')]
+  [readExcelBundle, path.join(webDir, 'node_modules', 'read-excel-file', 'bundle', 'read-excel-file.min.js')],
+  [writeExcelBundle, path.join(webDir, 'node_modules', 'write-excel-file', 'bundle', 'write-excel-file.min.js')]
 ]) {
   if (!fs.existsSync(source)) throw new Error(`Required web dependency is missing: ${path.relative(root, source)}. Run npm install first.`);
   fs.mkdirSync(path.dirname(destination), { recursive: true });

@@ -253,11 +253,32 @@
       .order('uploaded_at', { ascending: false });
     const rows = result.error ? [] : result.data || [];
     const photos = new Map();
+    const latestByRound = new Map();
     for (const row of rows) {
-      if (photos.has(row.round_id)) continue;
-      const signed = await client.storage.from('round-photos').createSignedUrl(row.storage_path, 3600);
-      if (!signed.error && signed.data?.signedUrl) photos.set(row.round_id, signed.data.signedUrl);
+      if (!latestByRound.has(row.round_id)) latestByRound.set(row.round_id, row.storage_path);
     }
+    const entries = [...latestByRound.entries()];
+    const batches = [];
+    for (let index = 0; index < entries.length; index += 100) {
+      batches.push(entries.slice(index, index + 100));
+    }
+    const signedBatches = await Promise.all(batches.map(batch =>
+      client.storage.from('round-photos').createSignedUrls(batch.map(([, storagePath]) => storagePath), 3600)
+    ));
+    signedBatches.forEach((signed, batchIndex) => {
+      if (signed.error) return;
+      const roundByPath = new Map();
+      for (const [roundId, storagePath] of batches[batchIndex]) {
+        const roundIdsForPath = roundByPath.get(storagePath) || [];
+        roundIdsForPath.push(roundId);
+        roundByPath.set(storagePath, roundIdsForPath);
+      }
+      for (const item of signed.data || []) {
+        if (item.signedUrl) {
+          for (const roundId of roundByPath.get(item.path) || []) photos.set(roundId, item.signedUrl);
+        }
+      }
+    });
     return photos;
   }
 
@@ -273,7 +294,7 @@
       client.from('schedules').select('*').order('start_time'),
       client.from('rounds').select('*').eq('scheduled_date', date).order('scheduled_start'),
       client.from('rounds').select('*').eq('status', 'completed').order('completed_at', { ascending: false }).limit(100),
-      client.from('profile_directory').select('*').order('full_name').then(result => result.error ? { data: [], error: null } : result),
+      client.from('profile_directory').select('*').order('full_name'),
       client.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100)
     ]);
 
@@ -288,7 +309,7 @@
     let adminProfiles = [];
     if (user.role === 'admin') {
       const result = await client.from('profiles').select('*').order('full_name');
-      if (!result.error) adminProfiles = result.data || [];
+      adminProfiles = unwrap(result, 'Could not load IT Staff accounts.') || [];
     }
 
     const members = new Map();

@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,20 +11,23 @@ const DATA_DIR = path.join(ROOT, "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || "127.0.0.1";
+if (!new Set(["127.0.0.1", "::1", "localhost"]).has(HOST.toLowerCase())) {
+  throw new Error("The local JSON prototype must bind to localhost. It uses demo credentials and is not safe to expose to a network.");
+}
 const SESSION_COOKIE = "rounds_session";
 const sessions = new Map();
 const eventClients = new Set();
-const MIME = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".ico": "image/x-icon"
-};
+const STATIC_FILES = new Map([
+  ["/", ["index.html", "text/html; charset=utf-8"]],
+  ["/index.html", ["index.html", "text/html; charset=utf-8"]],
+  ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/theme-init.js", ["theme-init.js", "text/javascript; charset=utf-8"]],
+  ["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
+  ["/supabase-client.js", ["supabase-client.js", "text/javascript; charset=utf-8"]],
+  ["/node_modules/@supabase/supabase-js/dist/umd/supabase.js", ["node_modules/@supabase/supabase-js/dist/umd/supabase.js", "text/javascript; charset=utf-8"]],
+  ["/node_modules/read-excel-file/bundle/read-excel-file.min.js", ["node_modules/read-excel-file/bundle/read-excel-file.min.js", "text/javascript; charset=utf-8"]],
+  ["/node_modules/write-excel-file/bundle/write-excel-file.min.js", ["node_modules/write-excel-file/bundle/write-excel-file.min.js", "text/javascript; charset=utf-8"]]
+]);
 
 const uid = (prefix) => prefix + "_" + crypto.randomUUID().slice(0, 8);
 const nowIso = () => new Date().toISOString();
@@ -167,20 +170,42 @@ async function loadStore() {
   }
   try {
     const parsed = JSON.parse(await readFile(STORE_PATH, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`The local data file has an invalid top-level structure and was left unchanged: ${STORE_PATH}`);
+    }
+    for (const key of ["users", "buildings", "rooms", "schedules", "rounds", "audit"]) {
+      if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {
+        throw new Error(`The local data file has invalid ${key} data and was left unchanged: ${STORE_PATH}`);
+      }
+    }
     return { ...defaultStoreShape(), ...parsed };
-  } catch {
-    const fresh = defaultStore();
-    await writeFile(STORE_PATH, JSON.stringify(fresh, null, 2), "utf8");
-    return fresh;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`The local data file is invalid JSON and was left unchanged: ${STORE_PATH}`, { cause: error });
+    }
+    throw error;
   }
 }
 function defaultStoreShape() {
   return { users: [], buildings: [], rooms: [], schedules: [], rounds: [], audit: [], demo: false };
 }
 let store = await loadStore();
+let persistQueue = Promise.resolve();
 
-async function persist() {
-  await writeFile(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
+function persist() {
+  const snapshot = JSON.stringify(store, null, 2);
+  const temporaryPath = `${STORE_PATH}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  const write = persistQueue.catch(() => {}).then(async () => {
+    await writeFile(temporaryPath, snapshot, { encoding: "utf8", flag: "wx" });
+    try {
+      await rename(temporaryPath, STORE_PATH);
+    } catch (error) {
+      await unlink(temporaryPath).catch(() => {});
+      throw error;
+    }
+  });
+  persistQueue = write;
+  return write;
 }
 function publicUser(user) {
   return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active };
@@ -212,13 +237,26 @@ function logAction(action, detail, actor) {
   store.audit = store.audit.slice(0, 300);
 }
 async function readJson(req) {
-  let raw = "";
+  const chunks = [];
+  let size = 0;
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 6_000_000) throw new Error("Request is too large.");
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += bytes.length;
+    if (size > 6_000_000) {
+      const error = new Error("Request is too large.");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(bytes);
   }
-  if (!raw) return {};
-  return JSON.parse(raw);
+  if (!size) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    const error = new Error("Request body must be valid JSON.");
+    error.status = 400;
+    throw error;
+  }
 }
 function adminOnly(user) {
   return user && user.role === "admin";
@@ -307,9 +345,9 @@ function validateSchedule(input, ignoreId = null) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
-  const pathname = decodeURIComponent(url.pathname);
   try {
+    const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+    const pathname = decodeURIComponent(url.pathname);
     if (pathname === "/api/session" && req.method === "GET") {
       const user = userFromRequest(req);
       return json(res, 200, { user: user ? publicUser(user) : null, demo: store.demo });
@@ -343,7 +381,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === "/api/state" && req.method === "GET") {
-      const dateKey = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("date") || "") ? url.searchParams.get("date") : manilaDate();
+      const requestedDate = url.searchParams.get("date");
+      if (requestedDate && requestedDate !== manilaDate()) {
+        return json(res, 400, { error: "Rounds can only be generated for today." });
+      }
+      const dateKey = manilaDate();
       const result = stateFor(user, dateKey);
       await persist();
       return json(res, 200, result);
@@ -519,6 +561,7 @@ const server = http.createServer(async (req, res) => {
         if (round.completedAt) return json(res, 409, { error: "This check has already been completed." });
         if (round.claimedBy && round.claimedBy !== user.id) return json(res, 409, { error: "Another staff member has already claimed this check." });
         round.claimedBy = user.id;
+        round.claimedAt ||= nowIso();
         logAction("Room check claimed", "Room " + round.roomId, user);
       } else if (action === "complete") {
         const check = {
@@ -528,15 +571,24 @@ const server = http.createServer(async (req, res) => {
           notes: String(body.notes || "").trim(),
           photo: typeof body.photo === "string" && body.photo.startsWith("data:image/") ? body.photo : ""
         };
+        if (round.completedAt) return json(res, 409, { error: "This check has already been completed." });
+        if (!adminOnly(user) && round.claimedBy !== user.id) return json(res, 409, { error: "Claim this room check before completing it." });
+        if (!["yes", "no", "unknown"].includes(check.pcInUse) || !["yes", "no", "unknown"].includes(check.laptopHdmi)) {
+          return json(res, 400, { error: "Answer each equipment question or choose Not checked." });
+        }
+        if (!["normal", "attention", "damaged", "unknown"].includes(check.display)) {
+          return json(res, 400, { error: "Choose a valid display condition." });
+        }
         if (check.photo.length > 2_500_000) return json(res, 400, { error: "Photo is too large. Use an image under 2 MB." });
         round.check = check;
         round.completedBy = user.id;
         round.completedAt = nowIso();
         round.claimedBy = user.id;
-        round.issueStatus = check.display === "attention" || check.laptopHdmi === "yes" || check.pcInUse === "no" ? "open" : null;
+        round.issueStatus = check.display === "attention" || check.display === "damaged" || check.laptopHdmi === "yes" || check.pcInUse === "no" ? "open" : null;
         logAction(round.issueStatus ? "Room issue reported" : "Room check completed", "Room " + round.roomId, user);
       } else {
         if (!adminOnly(user)) return json(res, 403, { error: "Admin access is required to resolve an issue." });
+        if (round.issueStatus !== "open") return json(res, 409, { error: "This room check has no open issue." });
         round.issueStatus = "resolved";
         round.resolvedAt = nowIso();
         round.resolvedBy = user.id;
@@ -548,19 +600,18 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname.startsWith("/api/")) return json(res, 404, { error: "That action is not available." });
 
-    const relative = pathname === "/" ? "index.html" : pathname.slice(1);
-    const target = path.resolve(ROOT, relative);
-    if (!target.startsWith(ROOT + path.sep) && target !== path.join(ROOT, "index.html")) {
-      res.writeHead(403); return res.end("Forbidden");
-    }
+    const file = STATIC_FILES.get(pathname);
+    if (!file) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" }); return res.end("Not found"); }
+    if (!["GET", "HEAD"].includes(req.method)) { res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Allow": "GET, HEAD", "X-Content-Type-Options": "nosniff" }); return res.end("Method not allowed"); }
+    const [relative, contentType] = file;
+    const target = path.join(ROOT, relative);
     let data;
     try { data = await readFile(target); }
-    catch { res.writeHead(404); return res.end("Not found"); }
-    const type = MIME[path.extname(target).toLowerCase()] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-cache" });
-    res.end(data);
+    catch { res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff" }); return res.end("Rounds assets are not installed. Run npm install first."); }
+    res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+    res.end(req.method === "HEAD" ? undefined : data);
   } catch (error) {
-    const status = error.message === "Unexpected end of JSON input" ? 400 : 500;
+    const status = error.status || 500;
     json(res, status, { error: error.message || "Something went wrong." });
   }
 });

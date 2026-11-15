@@ -4,7 +4,7 @@ Rounds is a shared room-check workspace for campus IT. The Electron app signs in
 
 ## Start the Electron app
 
-Requirements: Node.js 18 or newer.
+Requirements: Node.js 22.12 or newer.
 
 ```powershell
 npm install
@@ -17,7 +17,7 @@ Use the Admin account created in Supabase Auth to sign in. Do not start the conn
 
 The project URL and publishable key are read from the ignored `.env` file. The key is a client-side publishable key; database access is controlled by Row Level Security. Never put a Supabase secret or service-role key in `.env`, Electron, or renderer code.
 
-The base project schema and client integration migration have already been applied. Run [20261115120000_admin_data_management.sql](supabase/migrations/20261115120000_admin_data_management.sql) once in Supabase Dashboard > SQL Editor. It adds archive states, safe staff account management, audit entries for Admin data changes, and Realtime updates for workspace activity.
+The base project schema and client integration migration have already been applied. Run [20261115120000_admin_data_management.sql](supabase/migrations/20261115120000_admin_data_management.sql) and [20261115130000_limit_round_generation_to_today.sql](supabase/migrations/20261115130000_limit_round_generation_to_today.sql) once each in Supabase Dashboard > SQL Editor. The first adds archive states, safe staff account management, audit entries for Admin data changes, and Realtime updates for workspace activity. The second prevents authenticated clients from generating round records for arbitrary dates.
 
 Confirm the first account has the `admin` role in `public.profiles`. The schema’s Auth trigger creates new accounts as `staff` by default.
 
