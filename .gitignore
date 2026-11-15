@@ -1,0 +1,47 @@
+# Local workspace records may contain schedules, names, notes, and room photos.
+data/store.json
+*.log
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+mobile/www/
+.android-sdk/
+.android-user/
+.gradle-user/
+.android-commandline-tools.zip
+
+# Local configuration and signing credentials
+android/local.properties
+android/key.properties
+android/signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+
+# Generated Android, Capacitor, and Gradle output
+.gradle/
+**/.gradle/
+**/build/
+android/app/src/main/assets/public/
+
+# Build and package artifacts
+out/
+release/
+artifacts/
+*.apk
+*.aab
+*.apks
+
+# Local Supabase CLI state
+supabase/.temp/
+
+# Operating system noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+npm-debug.log*
+yarn-debug.log*

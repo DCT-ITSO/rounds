@@ -1,0 +1,22 @@
+{
+  "name": "rounds-campus-it",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Campus IT room rounds desktop app",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "mobile:prepare": "node mobile/prepare.cjs",
+    "android:debug": "npm run mobile:prepare && cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "electron": "^37.2.6"
+  }
+}

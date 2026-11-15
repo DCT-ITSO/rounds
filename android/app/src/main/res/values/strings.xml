@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rounds</string>
+    <string name="title_activity_main">Rounds</string>
+    <string name="package_name">com.rounds.campusit</string>
+    <string name="custom_url_scheme">com.rounds.campusit</string>
+</resources>

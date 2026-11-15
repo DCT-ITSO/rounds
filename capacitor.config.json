@@ -1,0 +1,8 @@
+{
+  "appId": "com.rounds.campusit",
+  "appName": "Rounds",
+  "webDir": "mobile/www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
