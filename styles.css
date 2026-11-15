@@ -493,3 +493,34 @@ button[aria-busy="true"]{cursor:progress}
 .button[aria-busy="true"]{opacity:.82}
 @keyframes button-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.button-spinner{animation:none;border-right-color:currentColor;border-top-color:transparent}}
+
+/* Shared history and administration refinements */
+.activity-tabs{display:flex;width:max-content;max-width:100%;gap:4px;padding:4px;margin:0 0 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-strong)}
+.activity-tab{display:inline-flex;min-height:40px;align-items:center;justify-content:center;padding:0 14px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);font:600 13px/1 var(--font);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.activity-tab:hover{color:var(--text)}
+.activity-tab.selected{border-color:var(--border);background:var(--surface);box-shadow:var(--shadow);color:var(--text)}
+.activity-empty{display:grid;min-height:72px;align-content:center;gap:4px;padding:14px 16px}
+.activity-empty strong{color:var(--text);font-size:13px;font-weight:600}
+.activity-empty span{color:var(--muted);font-size:12px;line-height:1.5}
+.form-error{grid-column:1/-1;margin:0 0 4px;padding:11px 12px;border:1px solid #fecaca;border-radius:7px;background:#fef2f2;color:#991b1b;font-size:13px;line-height:1.45}
+.team-card-list{display:none}
+.staff-card{padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:var(--shadow)}
+.staff-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.staff-card-details{display:grid;gap:12px;margin:0;padding:12px 0}
+.staff-card-details dt{color:var(--muted);font-size:12px;font-weight:600}
+.staff-card-details dd{margin:4px 0 0;color:var(--text);font-size:14px;overflow-wrap:anywhere}
+.staff-card-actions{padding-top:8px;border-top:1px solid var(--border)}
+:root[data-theme="dark"] .activity-tabs{border-color:var(--border);background:#18181b}
+:root[data-theme="dark"] .activity-tab{color:#b4b4bd}
+:root[data-theme="dark"] .activity-tab.selected{border-color:#3f3f46;background:#27272a;color:#fafafa}
+:root[data-theme="dark"] .form-error{border-color:#7f1d1d;background:#450a0a;color:#fda4af}
+@media(max-width:860px){
+  .team-table-wrap{display:none}
+  .team-card-list{display:grid;gap:10px;padding:12px}
+}
+@media(max-width:640px){
+  .activity-tabs{display:grid;width:100%;grid-template-columns:1fr 1fr}
+  .activity-tab{min-height:44px;padding:0 8px;font-size:12px}
+  .staff-card{padding:14px}
+  .staff-card-actions .record-actions{justify-content:flex-start}
+}
