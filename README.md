@@ -46,6 +46,22 @@ The function verifies the caller’s active Admin profile before creating an IT 
 
 The Electron build runs on desktop. The interface has narrow-screen layouts, but Electron itself is not an Android app and the local Electron window is not accessible from phones. Phone use needs the companion web/PWA client hosted on HTTPS and connected to the same Supabase project.
 
+## Browser build and GitHub Pages
+
+The Electron app uses a local static server and preload configuration. Build a browser-ready copy, with its SDK files bundled under `dist/vendor` and Supabase's client configuration injected at build time, by running:
+
+```powershell
+npm run web:build
+```
+
+The browser build uses `ROUNDS_SUPABASE_URL` and `ROUNDS_SUPABASE_PUBLISHABLE_KEY` from `.env` or the build environment. Only use the Supabase publishable key; never use a secret or service-role key in a browser build.
+
+GitHub Pages deployment is configured by `.github/workflows/deploy-pages.yml`. In the GitHub repository, add Actions variables named `ROUNDS_SUPABASE_URL` and `ROUNDS_SUPABASE_PUBLISHABLE_KEY` under Settings > Secrets and variables > Actions > Variables. Push to `main` or run the workflow manually from the Actions tab. GitHub Pages serves the browser app at `https://dct-itso.github.io/rounds/`.
+
+Set Settings > Pages > Build and deployment > Source to **GitHub Actions**. The first successful run publishes the site; later pushes to `main` redeploy it.
+
+In Supabase Dashboard > Authentication > URL Configuration, set the Site URL to `https://dct-itso.github.io/rounds/` and add `https://dct-itso.github.io/rounds/**` to Redirect URLs for password reset and invite links.
+
 ## Local JSON prototype
 
 `server.mjs` remains available for the earlier local-only prototype. It stores records in `data/store.json`, uses demo accounts, and binds to port `4173`. It does not use Supabase. If that port is already in use, an earlier prototype server is still running.
