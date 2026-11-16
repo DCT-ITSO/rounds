@@ -524,3 +524,26 @@ button[aria-busy="true"]{cursor:progress}
   .staff-card{padding:14px}
   .staff-card-actions .record-actions{justify-content:flex-start}
 }
+
+/* Bulk room entry */
+.bulk-room-link{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px}
+.bulk-room-settings{margin-bottom:12px}
+.bulk-range-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 9px}
+.bulk-range-heading h3{margin:0;font-size:14px;font-weight:620}
+.bulk-range-heading p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.bulk-room-ranges{display:grid;gap:10px}
+.bulk-range-row{position:relative;min-width:0;margin:0;padding:13px 12px 12px;border:1px solid var(--border);border-radius:9px}
+.bulk-range-row legend{padding:0 5px;font-size:12px;font-weight:620}
+.bulk-range-remove{position:absolute;top:4px;right:8px;min-height:28px;padding:0 8px}
+.bulk-range-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px}
+.bulk-floor-field{max-width:150px}
+.bulk-append-name{display:flex;align-items:center;align-self:end;gap:8px;min-height:36px;color:var(--muted);font-size:12px}
+.bulk-append-name input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
+.bulk-room-preview{margin-top:12px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-muted,rgba(127,127,127,.06))}
+.bulk-room-preview>strong{font-size:12px}
+.bulk-room-preview ul{display:grid;gap:5px;margin:8px 0 0;padding:0;list-style:none}
+.bulk-room-preview li{display:grid;grid-template-columns:minmax(80px,.7fr) minmax(120px,1.5fr) minmax(70px,.5fr);gap:8px;color:var(--muted);font-size:11px}
+.bulk-room-preview li span:first-child{color:var(--text);font-weight:560}
+.bulk-preview-error{color:var(--danger,#b42318);font-size:12px}
+.bulk-room-hint{display:block;margin-top:9px}
+@media(max-width:640px){.bulk-range-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.bulk-floor-field{max-width:none}.bulk-append-name{grid-column:1/-1;min-height:30px}.bulk-room-preview li{grid-template-columns:minmax(65px,.7fr) minmax(110px,1.4fr) minmax(60px,.5fr);gap:5px;font-size:10px}.bulk-room-link{align-items:flex-start}.bulk-range-heading p{max-width:32ch}}

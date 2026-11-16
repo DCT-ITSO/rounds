@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { isServiceRoleKey } = require('./supabase-key.cjs');
 
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'dist');
@@ -20,17 +21,6 @@ function replaceOnce(source, search, replacement, label) {
     throw new Error(`Expected one ${label} entry in index.html.`);
   }
   return source.slice(0, first) + replacement + source.slice(first + search.length);
-}
-
-function isServiceRoleKey(key) {
-  if (/^sb_secret_/i.test(key)) return true;
-  const payload = key.split('.')[1];
-  if (!payload) return false;
-  try {
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')).role === 'service_role';
-  } catch {
-    return false;
-  }
 }
 
 const fileEnv = readEnv(path.join(root, '.env'));

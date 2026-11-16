@@ -58,13 +58,21 @@ Deno.serve(async (request) => {
   });
   if (error) return reply({ error: error.message }, 400);
 
-  await adminClient.from('activity_log').insert({
+  const { error: activityError } = await adminClient.from('activity_log').insert({
     actor_id: authData.user.id,
     action: 'staff_created',
     entity_type: 'staff',
     entity_id: data.user.id,
     details: { name: fullName }
   });
+  if (activityError) {
+    const { error: cleanupError } = await adminClient.auth.admin.deleteUser(data.user.id);
+    return reply({
+      error: cleanupError
+        ? 'The staff account was created, but its activity record failed and cleanup could not remove it. Contact an Admin.'
+        : 'Staff account creation was rolled back because its activity could not be recorded.'
+    }, 500);
+  }
 
   return reply({ user: { id: data.user.id, name: fullName, email, role: 'staff', active: true } }, 201);
 

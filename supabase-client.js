@@ -703,6 +703,42 @@
       unwrap(await client.from('buildings').insert(data).select('*').single(), 'Could not add the building.');
       return { saved: true };
     }
+    if (path === '/api/rooms/bulk' && method === 'POST') {
+      await requireAdmin();
+      const buildingId = String(body.buildingId || '').trim();
+      const requested = Array.isArray(body.rooms) ? body.rooms : [];
+      if (!buildingId || !requested.length || requested.length > 250) fail('Choose a building and add between 1 and 250 rooms.');
+      const building = unwrap(
+        await client.from('buildings').select('id,floors,is_active').eq('id', buildingId).maybeSingle(),
+        'Could not load the selected building.'
+      );
+      if (!building || !building.is_active) fail('Choose an active building before adding rooms.');
+      const seen = new Set();
+      const data = requested.map((room, index) => {
+        const roomNumber = String(room?.roomNumber || '').trim();
+        const name = String(room?.name || '').trim();
+        const floor = String(room?.floor || '').trim();
+        if (!roomNumber || !name || !/^\d+$/.test(floor) || Number(floor) < 1) {
+          fail('Room ' + (index + 1) + ' needs a room number, name, and a valid floor.');
+        }
+        if (building.floors && Number(floor) > Number(building.floors)) {
+          fail('Floor ' + floor + ' exceeds the ' + building.floors + ' floors in this building.');
+        }
+        const key = roomNumber.toLowerCase();
+        if (seen.has(key)) fail('The batch contains the room number "' + roomNumber + '" more than once.');
+        seen.add(key);
+        return { building_id: buildingId, room_number: roomNumber, name, floor, equipment: equipmentValues(body.equipment) };
+      });
+      const existing = unwrap(
+        await client.from('rooms').select('room_number').eq('building_id', buildingId),
+        'Could not check existing room numbers.'
+      ) || [];
+      const existingNumbers = new Set(existing.map(room => String(room.room_number || '').trim().toLowerCase()));
+      const duplicate = data.find(room => existingNumbers.has(room.room_number.toLowerCase()));
+      if (duplicate) fail('Room number "' + duplicate.room_number + '" already exists in this building.');
+      unwrap(await client.from('rooms').insert(data).select('id'), 'Could not add the rooms.');
+      return { saved: true, created: data.length };
+    }
     if (path === '/api/rooms' && method === 'POST') {
       await requireAdmin();
       const data = {

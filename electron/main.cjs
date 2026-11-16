@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
+const { isServiceRoleKey } = require('../scripts/supabase-key.cjs');
 
 const root = path.resolve(__dirname, '..');
 const staticFiles = new Map([
@@ -98,6 +99,9 @@ function createWindow(appUrl) {
 loadLocalEnv();
 
 app.whenReady().then(async () => {
+  if (isServiceRoleKey(process.env.ROUNDS_SUPABASE_PUBLISHABLE_KEY)) {
+    throw new Error('A service-role key cannot be used by the Electron app. Set ROUNDS_SUPABASE_PUBLISHABLE_KEY to the Supabase publishable key.');
+  }
   const appUrl = await startStaticServer();
   createWindow(appUrl);
   app.on('activate', () => {

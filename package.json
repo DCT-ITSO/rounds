@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
     "web:build": "node scripts/build-browser.cjs",
     "mobile:prepare": "node mobile/prepare.cjs",
     "android:debug": "npm run mobile:prepare && cap sync android && cd android && gradlew.bat assembleDebug"

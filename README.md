@@ -2,6 +2,8 @@
 
 Rounds is a shared room-check workspace for campus IT. The Electron app signs in with Supabase Auth, stores shared records in Supabase, and receives live updates for room checks and issues.
 
+See [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) for the architecture and feature summary, and [HANDOFF.md](HANDOFF.md) for the current local changes and deployment steps.
+
 ## Start the Electron app
 
 Requirements: Node.js 22.12 or newer.
@@ -11,13 +13,15 @@ npm install
 npm start
 ```
 
+Run the built-in regression tests with `npm test`.
+
 Use the Admin account created in Supabase Auth to sign in. Do not start the connected app with `node server.mjs`; that command starts the old local JSON prototype on port `4173`. It is separate from Supabase and is not used by Electron.
 
 ## Supabase setup
 
 The project URL and publishable key are read from the ignored `.env` file. The key is a client-side publishable key; database access is controlled by Row Level Security. Never put a Supabase secret or service-role key in `.env`, Electron, or renderer code.
 
-The base project schema and client integration migration have already been applied. Run [20261115120000_admin_data_management.sql](supabase/migrations/20261115120000_admin_data_management.sql) and [20261115130000_limit_round_generation_to_today.sql](supabase/migrations/20261115130000_limit_round_generation_to_today.sql) once each in Supabase Dashboard > SQL Editor. The first adds archive states, safe staff account management, audit entries for Admin data changes, and Realtime updates for workspace activity. The second prevents authenticated clients from generating round records for arbitrary dates.
+The base project schema and client integration migration have already been applied. Run [20261115120000_admin_data_management.sql](supabase/migrations/20261115120000_admin_data_management.sql), [20261115130000_limit_round_generation_to_today.sql](supabase/migrations/20261115130000_limit_round_generation_to_today.sql), and [20261116120000_prevent_schedule_overlaps.sql](supabase/migrations/20261116120000_prevent_schedule_overlaps.sql) once each in Supabase Dashboard > SQL Editor. The first adds archive states, safe staff account management, audit entries for Admin data changes, and Realtime updates for workspace activity. The second prevents authenticated clients from generating round records for arbitrary dates. The third blocks overlapping active schedules in the database, including concurrent writes; it reports existing overlaps without changing those records.
 
 Confirm the first account has the `admin` role in `public.profiles`. The schema’s Auth trigger creates new accounts as `staff` by default.
 

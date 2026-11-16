@@ -418,6 +418,50 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, { building });
     }
 
+    if (pathname === "/api/rooms/bulk" && req.method === "POST") {
+      if (!adminOnly(user)) return json(res, 403, { error: "Admin access is required." });
+      const body = await readJson(req);
+      const building = store.buildings.find((item) => item.id === body.buildingId && item.active);
+      const requested = Array.isArray(body.rooms) ? body.rooms : [];
+      if (!building) return json(res, 400, { error: "Choose an active building before adding rooms." });
+      if (!requested.length || requested.length > 250) return json(res, 400, { error: "Add between 1 and 250 rooms at a time." });
+      const seen = new Set();
+      const rooms = [];
+      for (let index = 0; index < requested.length; index++) {
+        const item = requested[index] || {};
+        const roomNumber = String(item.roomNumber || "").trim();
+        const name = String(item.name || "").trim();
+        const floor = String(item.floor || "").trim();
+        if (!roomNumber || !name || !/^\d+$/.test(floor) || Number(floor) < 1) {
+          return json(res, 400, { error: "Room " + (index + 1) + " needs a room number, name, and a valid floor." });
+        }
+        if (building.floors && Number(floor) > Number(building.floors)) {
+          return json(res, 400, { error: "Floor " + floor + " exceeds the " + building.floors + " floors in this building." });
+        }
+        const key = roomNumber.toLowerCase();
+        if (seen.has(key)) return json(res, 409, { error: 'The batch contains room number "' + roomNumber + '" more than once.' });
+        seen.add(key);
+        rooms.push({ roomNumber, name, floor });
+      }
+      const existing = new Set(store.rooms.filter((room) => room.buildingId === building.id).map((room) => String(room.roomNumber || "").trim().toLowerCase()));
+      const duplicate = rooms.find((room) => existing.has(room.roomNumber.toLowerCase()));
+      if (duplicate) return json(res, 409, { error: 'Room number "' + duplicate.roomNumber + '" already exists in this building.' });
+      const equipment = Array.isArray(body.equipment) ? body.equipment : String(body.equipment || "").split(",");
+      const equipmentValues = [...new Set(equipment.map((value) => String(value).trim()).filter(Boolean))];
+      const created = rooms.map((room) => ({
+        id: uid("room"),
+        buildingId: building.id,
+        roomNumber: room.roomNumber,
+        name: room.name,
+        floor: room.floor,
+        equipment: equipmentValues,
+        active: true
+      }));
+      store.rooms.push(...created);
+      logAction("Rooms added", building.name + " · " + created.length + " rooms", user);
+      await persist(); broadcast();
+      return json(res, 201, { rooms: created, created: created.length });
+    }
     if (pathname === "/api/rooms" && req.method === "POST") {
       if (!adminOnly(user)) return json(res, 403, { error: "Admin access is required." });
       const body = await readJson(req);
@@ -425,9 +469,10 @@ const server = http.createServer(async (req, res) => {
       const roomName = String(body.name || "").trim();
       const building = store.buildings.find((item) => item.id === body.buildingId && item.active);
       if (!building || !roomNumber || !roomName) return json(res, 400, { error: "Building, room number, and room name are required." });
-      const duplicate = store.rooms.some((room) => room.active && room.buildingId === building.id && room.roomNumber.toLowerCase() === roomNumber.toLowerCase());
+      const duplicate = store.rooms.some((room) => room.buildingId === building.id && String(room.roomNumber || "").trim().toLowerCase() === roomNumber.toLowerCase());
       if (duplicate) return json(res, 409, { error: "That room number already exists in this building." });
-      const room = { id: uid("room"), buildingId: building.id, roomNumber, name: roomName, floor: String(body.floor || "1"), equipment: ["PC", "TV"], active: true };
+      const equipment = Array.isArray(body.equipment) ? body.equipment : String(body.equipment || "").split(",");
+      const room = { id: uid("room"), buildingId: building.id, roomNumber, name: roomName, floor: String(body.floor || "1"), equipment: [...new Set(equipment.map((value) => String(value).trim()).filter(Boolean))], active: true };
       store.rooms.push(room);
       logAction("Room added", building.name + " · " + roomNumber, user);
       await persist(); broadcast();
