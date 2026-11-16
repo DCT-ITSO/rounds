@@ -267,15 +267,17 @@ function validTime(time) {
 function overlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
-function checkScheduleConflict(schedule, ignoreId = null) {
-  return store.schedules.find((other) => {
-    if (!other.active || other.id === ignoreId || other.roomId !== schedule.roomId) return false;
+function checkScheduleConflict(schedule, ignoreId = null, pending = []) {
+  return [...store.schedules, ...pending].find((other) => {
+    if (!other.active || other.archived || other.id === ignoreId || other.roomId !== schedule.roomId) return false;
     const sameDay = other.days.some((day) => schedule.days.includes(day));
     return sameDay && overlap(schedule.startTime, schedule.endTime, other.startTime, other.endTime);
   });
 }
 function getRoom(roomId) {
-  return store.rooms.find((room) => room.id === roomId && room.active);
+  const room = store.rooms.find((item) => item.id === roomId && item.active);
+  const building = room && store.buildings.find((item) => item.id === room.buildingId && item.active);
+  return building ? room : undefined;
 }
 function stateFor(user, dateKey) {
   const generated = buildTasks(store, dateKey);
@@ -333,14 +335,14 @@ function stateFor(user, dateKey) {
     demo: store.demo
   };
 }
-function validateSchedule(input, ignoreId = null) {
+function validateSchedule(input, ignoreId = null, pending = []) {
   const room = getRoom(input.roomId);
   if (!room) return "Choose an active room.";
   if (!input.instructor?.trim()) return "Instructor name is required.";
   if (!input.course?.trim()) return "Course or class name is required.";
   if (!Array.isArray(input.days) || !input.days.length || input.days.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) return "Choose at least one valid day.";
   if (!validTime(input.startTime) || !validTime(input.endTime) || input.endTime <= input.startTime) return "Enter a valid start and end time.";
-  if (checkScheduleConflict(input, ignoreId)) return "This room already has a schedule overlapping that time.";
+  if (checkScheduleConflict(input, ignoreId, pending)) return "This room already has a schedule overlapping that time.";
   return null;
 }
 
@@ -477,6 +479,37 @@ const server = http.createServer(async (req, res) => {
       logAction("Room added", building.name + " · " + roomNumber, user);
       await persist(); broadcast();
       return json(res, 201, { room });
+    }
+
+    if (pathname === "/api/schedules/bulk" && req.method === "POST") {
+      if (!adminOnly(user)) return json(res, 403, { error: "Admin access is required." });
+      const body = await readJson(req);
+      if (!Array.isArray(body.schedules) || body.schedules.length < 1 || body.schedules.length > 100) {
+        return json(res, 400, { error: "Add between 1 and 100 schedule slots." });
+      }
+      const pending = [];
+      for (const item of body.schedules) {
+        const schedule = {
+          roomId: String(body.roomId || ""),
+          instructor: String(item.instructor || "").trim(),
+          course: String(item.course || "").trim(),
+          section: String(item.section || "").trim(),
+          days: Array.isArray(item.days) ? [...new Set(item.days.map(Number))] : [],
+          startTime: String(item.startTime || ""),
+          endTime: String(item.endTime || ""),
+          active: true,
+          revision: 1
+        };
+        const error = validateSchedule(schedule, null, pending);
+        if (error) return json(res, 400, { error });
+        pending.push(schedule);
+      }
+      const created = pending.map((schedule) => ({ ...schedule, id: uid("schedule") }));
+      const room = getRoom(String(body.roomId || ""));
+      store.schedules.push(...created);
+      logAction("Schedules added", created.length + " time slots in room " + room.roomNumber, user);
+      await persist(); broadcast();
+      return json(res, 201, { created: created.length });
     }
 
     if (pathname === "/api/schedules" && req.method === "POST") {

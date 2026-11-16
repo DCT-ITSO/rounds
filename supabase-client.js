@@ -432,6 +432,34 @@
     return { saved: true };
   }
 
+  async function insertSchedules(payload) {
+    const user = await readCurrentUser();
+    if (!user || user.role !== 'admin') fail('Only an Admin can change schedules.');
+    if (!lastState) fail('Refresh the workspace before changing schedules.');
+    if (!Array.isArray(payload.schedules) || payload.schedules.length < 1 || payload.schedules.length > 100) {
+      fail('Add between 1 and 100 schedule slots.');
+    }
+    const pending = [];
+    const rows = payload.schedules.map(item => {
+      const schedule = { ...item, roomId: payload.roomId };
+      const days = validateSchedule(schedule, lastState.schedules, null, pending);
+      pending.push({
+        roomId: schedule.roomId,
+        days,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        active: true,
+        archived: false
+      });
+      return schedulePayload(schedule, days, user.id);
+    });
+    const inserted = unwrap(
+      await client.from('schedules').insert(rows).select('id'),
+      'Could not add the schedules.'
+    );
+    return { saved: true, created: Array.isArray(inserted) ? inserted.length : rows.length };
+  }
+
   async function updateSchedule(id, payload) {
     const user = await readCurrentUser();
     if (!user || user.role !== 'admin') fail('Only an Admin can change schedules.');
@@ -751,6 +779,7 @@
       unwrap(await client.from('rooms').insert(data).select('*').single(), 'Could not add the room.');
       return { saved: true };
     }
+    if (path === '/api/schedules/bulk' && method === 'POST') return insertSchedules(body);
     if (path === '/api/schedules' && method === 'POST') return insertSchedule(body);
     if (path === '/api/schedules/import' && method === 'POST') return importSchedules(body);
     if (path === '/api/users' && method === 'POST') return createStaff(body);
