@@ -611,3 +611,8 @@ button[aria-busy="true"]{cursor:progress}
 :root[data-theme="dark"] .planner-slot.paused{background:#202024}
 @media(max-width:1000px){.planner-week-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.planner-selection{grid-template-columns:1fr}.planner-selection-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.planner-lock-hint{grid-column:1}}
 @media(max-width:640px){.planner-selection{gap:12px;padding:14px}.planner-selection-fields{grid-template-columns:1fr;gap:10px}.planner-week-desktop{display:none}.planner-week-mobile{display:block}.planner-editor-head{align-items:flex-start;flex-direction:column;padding:14px}.planner-editor-head .button{width:100%;min-height:42px}.planner-draft{margin:10px;padding:11px}.planner-draft-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planner-days-field{margin:0 10px 12px}.planner-form-foot{align-items:stretch;flex-direction:column;padding:12px}.planner-form-foot .button{min-height:44px}.planner-room-building{font-size:11px}.planner-mobile-tabs{gap:3px;padding:9px 8px}.planner-day-tab{min-height:42px;padding:0 2px;font-size:11px}}
+
+.building-content[hidden]{display:none}
+.building-collapse{flex:0 0 auto}
+.building-collapse svg{transition:transform .16s ease}
+.building-collapse[aria-expanded="false"] svg{transform:rotate(-90deg)}
