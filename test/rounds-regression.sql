@@ -100,4 +100,63 @@ begin
 end;
 $$;
 
+do $$
+declare
+  admin_id uuid := gen_random_uuid();
+  staff_id uuid := gen_random_uuid();
+  building_id uuid;
+  target_room uuid;
+  selected jsonb;
+  incoming jsonb;
+  campus_date date := (now() at time zone 'Asia/Manila')::date;
+  weekday smallint[] := array[extract(dow from campus_date)::smallint];
+begin
+  insert into auth.users (id, email) values (admin_id, admin_id || '@example.invalid'), (staff_id, staff_id || '@example.invalid');
+  update public.profiles set role = 'admin' where id = admin_id;
+  perform set_config('request.jwt.claim.sub', admin_id::text, true);
+  insert into public.buildings (code, name)
+  values ('replace-' || admin_id, 'Replacement building') returning id into building_id;
+  insert into public.rooms (building_id, room_number, name)
+  values (building_id, '101', 'Test lab') returning id into target_room;
+  insert into public.schedules (room_id, instructor_name, course_name, days_of_week, start_time, end_time, effective_start)
+  values
+    (target_room, 'Ada', 'Networks', weekday, '08:00', '09:00', campus_date),
+    (target_room, 'Sam', 'Programming', weekday, '09:00', '10:00', campus_date),
+    (target_room, 'Lee', 'Keep this class', weekday, '10:00', '11:00', campus_date);
+
+  select jsonb_agg(jsonb_build_object('id', s.id, 'updated_at', s.updated_at)) into selected
+  from public.schedules s where s.room_id = target_room and s.course_name in ('Networks', 'Programming');
+  incoming := jsonb_build_array(
+    jsonb_build_object('room_id', target_room, 'instructor_name', 'Ada', 'course_name', 'Networks', 'days_of_week', weekday, 'start_time', '09:00', 'end_time', '10:00'),
+    jsonb_build_object('room_id', target_room, 'instructor_name', 'Sam', 'course_name', 'Programming', 'days_of_week', weekday, 'start_time', '08:00', 'end_time', '09:00')
+  );
+
+  perform set_config('request.jwt.claim.sub', staff_id::text, true);
+  begin
+    perform public.replace_selected_schedules(selected, incoming);
+    raise exception 'Staff replaced schedules' using errcode='XX000';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claim.sub', admin_id::text, true);
+
+  begin
+    perform public.replace_selected_schedules(selected, jsonb_set(incoming, '{0,end_time}', '"10:30"'));
+    raise exception 'Replacement overlapped an unselected schedule' using errcode='XX000';
+  exception when exclusion_violation then null;
+  end;
+  assert (select count(*) = 3 from public.schedules s where s.room_id = target_room and not s.is_archived),
+    'A failed replacement archived a schedule';
+
+  assert public.replace_selected_schedules(selected, incoming) = 2;
+  assert (select count(*) = 2 from public.schedules s where s.room_id = target_room and s.is_archived);
+  assert exists (select 1 from public.schedules s where s.room_id = target_room and s.course_name = 'Networks' and s.start_time = '09:00' and not s.is_archived);
+  assert exists (select 1 from public.schedules s where s.room_id = target_room and s.course_name = 'Keep this class' and not s.is_archived);
+  begin
+    perform public.replace_selected_schedules(selected, incoming);
+    raise exception 'An obsolete selection was accepted' using errcode='XX000';
+  exception when raise_exception then null;
+  end;
+end;
+$$;
+
 rollback;

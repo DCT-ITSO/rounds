@@ -549,7 +549,7 @@ button[aria-busy="true"]{cursor:progress}
 @media(max-width:640px){.bulk-range-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.bulk-floor-field{max-width:none}.bulk-append-name{grid-column:1/-1;min-height:30px}.bulk-room-preview li{grid-template-columns:minmax(65px,.7fr) minmax(110px,1.4fr) minmax(60px,.5fr);gap:5px;font-size:10px}.bulk-room-link{align-items:flex-start}.bulk-range-heading p{max-width:32ch}}
 
 /* Bulk room modal layout and dark-theme contrast */
-.dialog{display:flex;flex-direction:column;overflow:hidden}
+.dialog[open]{display:flex;flex-direction:column;overflow:hidden}
 .dialog-head,.dialog-foot{flex:0 0 auto}
 .dialog-body{flex:1 1 auto;min-height:0;max-height:none;overscroll-behavior:contain}
 .form-label{color:var(--muted)}
@@ -597,8 +597,7 @@ button[aria-busy="true"]{cursor:progress}
 .planner-draft{min-width:0;margin:12px;padding:12px;border:1px solid var(--border);border-radius:8px}
 .planner-draft-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .planner-draft legend{padding:0 4px;font-size:13px;font-weight:650}
-.planner-draft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px}
-.planner-days-field{margin-top:12px}
+.planner-draft-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
 .planner-form-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--border)}
 .planner-form-foot .form-hint{max-width:60ch}
 .planner-form-actions{display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
@@ -611,7 +610,7 @@ button[aria-busy="true"]{cursor:progress}
 :root[data-theme="dark"] .planner-slot{background:var(--surface)}
 :root[data-theme="dark"] .planner-slot.paused{background:#202024}
 @media(max-width:1000px){.planner-week-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.planner-selection{grid-template-columns:1fr}.planner-selection-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.planner-lock-hint{grid-column:1}}
-@media(max-width:640px){.planner-selection{gap:12px;padding:14px}.planner-selection-fields{grid-template-columns:1fr;gap:10px}.planner-week-desktop{display:none}.planner-week-mobile{display:block}.planner-editor-head{align-items:flex-start;flex-direction:column;padding:14px}.planner-editor-head .button{width:100%;min-height:42px}.planner-draft{margin:10px;padding:11px}.planner-draft-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planner-days-field{margin:0 10px 12px}.planner-form-foot{align-items:stretch;flex-direction:column;padding:12px}.planner-form-foot .button{min-height:44px}.planner-room-building{font-size:11px}.planner-mobile-tabs{gap:3px;padding:9px 8px}.planner-day-tab{min-height:42px;padding:0 2px;font-size:11px}}
+@media(max-width:640px){.planner-selection{gap:12px;padding:14px}.planner-selection-fields{grid-template-columns:1fr;gap:10px}.planner-week-desktop{display:none}.planner-week-mobile{display:block}.planner-editor-head{align-items:flex-start;flex-direction:column;padding:14px}.planner-editor-head .button{width:100%;min-height:42px}.planner-draft{margin:10px;padding:11px}.planner-draft-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planner-form-foot{align-items:stretch;flex-direction:column;padding:12px}.planner-form-foot .button{min-height:44px}.planner-room-building{font-size:11px}.planner-mobile-tabs{gap:3px;padding:9px 8px}.planner-day-tab{min-height:42px;padding:0 2px;font-size:11px}}
 
 .building-content[hidden]{display:none}
 .building-collapse{flex:0 0 auto}
@@ -624,3 +623,28 @@ button[aria-busy="true"]{cursor:progress}
 .schedule-import{grid-template-columns:minmax(0,1fr)}
 .schedule-import .upload-zone input{max-width:100%}
 .schedule-import .import-error ul{margin:6px 0 0;padding-inline-start:18px}
+
+.timetable-grid{min-width:60rem;table-layout:fixed;white-space:normal}
+.timetable-grid th:first-child{width:6rem;position:sticky;left:0;z-index:1}
+.timetable-grid thead th:first-child{z-index:2}
+.timetable-grid td,.timetable-grid tbody th{vertical-align:top;padding:9px;border:1px solid var(--border);overflow-wrap:anywhere}
+.timetable-grid td:last-child{min-width:0}
+.timetable-class{display:grid;gap:3px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;line-height:1.35}
+.timetable-class+.timetable-class{margin-top:6px}
+.timetable-class span{color:var(--muted)}
+.timetable-scroll-hint{display:none}
+@media(max-width:1240px){.timetable-scroll-hint{display:block;margin:0;padding:10px 12px}}
+
+.replacement-schedules{min-width:0;grid-template-columns:minmax(0,1fr);border:1px solid var(--border);border-radius:7px;padding:10px}
+.replacement-schedules legend{padding:0 5px;font-weight:600}
+.replacement-list{max-height:12rem;overflow:auto}
+.replacement-list label:not([hidden]){display:flex;align-items:flex-start;gap:8px;padding:6px 2px;font-size:12px}
+.page-actions:has([data-action="replace-schedules"]){flex-wrap:wrap}
+
+.planner-sections{margin-top:16px;border-top:1px solid var(--border)}
+.planner-sections-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:12px 0}
+.planner-sections-header p{margin:4px 0 0}
+.planner-section-row{display:grid;grid-template-columns:minmax(9rem,.75fr) minmax(0,2fr) auto;align-items:end;gap:12px;padding:11px 0;border-top:1px solid var(--border)}
+.planner-section-row .form-field{min-width:0}
+.planner-section-remove{justify-self:end}
+@media(max-width:780px){.planner-section-row{grid-template-columns:minmax(0,1fr);gap:8px}.planner-section-remove{justify-self:start}}

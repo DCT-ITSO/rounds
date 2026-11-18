@@ -579,6 +579,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/schedules/import" && req.method === "POST") {
       if (!adminOnly(user)) return json(res, 403, { error: "Admin access is required." });
       const body = await readJson(req);
+      if (body.replaceSelection !== undefined) return json(res, 400, { error: "Schedule replacement requires Supabase." });
       if (!Array.isArray(body.rows) || !body.rows.length) return json(res, 400, { error: "There are no schedule rows to import." });
       const prepared = [];
       const errors = [];

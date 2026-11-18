@@ -129,9 +129,12 @@
       days: (row.days_of_week || []).map(Number),
       startTime: fromTime(row.start_time),
       endTime: fromTime(row.end_time),
+      effectiveStart: row.effective_start,
+      effectiveEnd: row.effective_end,
       active: row.is_active,
       archived: row.is_archived === true,
-      revision: row.revision
+      revision: row.revision,
+      updatedAt: row.updated_at
     };
   }
 
@@ -559,6 +562,15 @@
     const sourceRows = Array.isArray(body.rows) ? body.rows : [];
     if (!sourceRows.length) fail('The file has no schedule rows to import.');
 
+    const replacing = body.replaceSelection !== undefined;
+    if (replacing && !Array.isArray(body.replaceSelection)) fail('Select schedules to replace.');
+    const selected = new Map((body.replaceSelection || []).map(item => [item?.id, item?.updated_at]));
+    if (replacing && !selected.size) fail('Select at least one schedule to replace.');
+    const oldSchedules = lastState.schedules.filter(item => item.updatedAt && selected.get(item.id) === item.updatedAt && item.active && !item.archived);
+    if (oldSchedules.length !== selected.size) fail('A selected schedule changed. Refresh and select it again.');
+    const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const retained = replacing ? lastState.schedules.filter(item => !selected.has(item.id) && (!item.effectiveEnd || item.effectiveEnd >= date)) : lastState.schedules;
+
     const errors = [];
     const rows = [];
     const pending = [];
@@ -580,7 +592,7 @@
         days: Array.isArray(row.days) ? row.days.map(Number) : []
       };
       try {
-        const days = validateSchedule(payload, lastState.schedules, null, pending);
+        const days = validateSchedule(payload, retained, null, pending);
         const data = schedulePayload(payload, days, user.id);
         rows.push(data);
         pending.push({
@@ -600,6 +612,13 @@
       const error = new Error('Fix the schedule rows before importing.');
       error.errors = errors;
       throw error;
+    }
+    if (replacing) {
+      const result = await client.rpc('replace_selected_schedules', {
+        p_old: oldSchedules.map(item => ({ id: item.id, updated_at: item.updatedAt })),
+        p_rows: rows
+      });
+      return { imported: unwrap(result, 'Could not replace the selected schedules.'), archived: oldSchedules.length };
     }
     const result = await client.from('schedules').insert(rows).select('id');
     unwrap(result, 'Could not import the schedules.');

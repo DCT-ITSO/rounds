@@ -145,7 +145,7 @@ test('planner suggests distinct saved values for each text field', () => {
   assert.match(slot, /type="button" data-action="clear-planner-days" data-index="0"/);
 });
 
-test('typing updates the draft and Unselect all clears only that slot', async () => {
+test('typing updates the draft and Unselect all clears only that section', async () => {
   const app = { querySelectorAll: () => [] };
   const dayInputs = [{ checked: true }, { checked: true }];
   const input = {
@@ -155,17 +155,31 @@ test('typing updates the draft and Unselect all clears only that slot', async ()
     closest: () => null
   };
   const button = {
-    dataset: { action: 'clear-planner-days', index: '1' },
+    dataset: { action: 'clear-planner-days', index: '0', sectionIndex: '1' },
     closest: () => ({ querySelectorAll: () => dayInputs })
   };
   const run = workspace({ '#app': app }, { input, button });
-  assert.equal(run('plannerDraft().days.length'), 0);
-  run('s.schedulePlanner.drafts=[{...plannerDraft(),days:[1,3,5]},{...plannerDraft(),days:[2,4]}]; bind(); app.oninput({target:input})');
+  assert.equal(run('plannerDraft().sections[0].days.length'), 0);
+  run('s.schedulePlanner.drafts=[{...plannerDraft(),sections:[{section:"3A",days:[1,3,5]},{section:"3B",days:[2,4]}]},plannerDraft()]; bind(); app.oninput({target:input})');
   await run('app.onclick({target:{closest:selector=>selector==="[data-action]"?button:null}})');
   assert.equal(run('s.schedulePlanner.drafts[1].instructor'), 'Ada Reyes');
-  assert.equal(run('s.schedulePlanner.drafts[0].days.join(",")'), '1,3,5');
-  assert.equal(run('s.schedulePlanner.drafts[1].days.length'), 0);
+  assert.equal(run('s.schedulePlanner.drafts[0].sections[0].days.join(",")'), '1,3,5');
+  assert.equal(run('s.schedulePlanner.drafts[0].sections[1].days.length'), 0);
   assert.ok(dayInputs.every(day => !day.checked));
+});
+
+test('planner shares class details across sections and rejects overlapping days', () => {
+  const run = workspace();
+  const result = run(`
+    const draft={instructor:"Ada Reyes",course:"Networks",startTime:"08:00",endTime:"09:00",
+      sections:[{section:"3A",days:[1,3]},{section:"3B",days:[2,4]}]};
+    JSON.stringify(plannerSchedules([draft]));
+  `);
+  assert.deepEqual(JSON.parse(result), [
+    { instructor: 'Ada Reyes', course: 'Networks', startTime: '08:00', endTime: '09:00', section: '3A', days: [1, 3] },
+    { instructor: 'Ada Reyes', course: 'Networks', startTime: '08:00', endTime: '09:00', section: '3B', days: [2, 4] }
+  ]);
+  assert.throws(() => run('draft.sections[1].days=[1,4]; plannerSchedules([draft])'), /Mon is selected for more than one section/);
 });
 
 test('import preview checks every row before allowing a save', async () => {
@@ -204,4 +218,58 @@ test('cancelling planner entry clears the draft and keeps the current location',
   assert.equal(run('s.schedulePlanner.drafts.length'), 0);
   assert.equal(run('s.schedulePlanner.buildingId + "/" + s.schedulePlanner.roomId'), 'b/r');
   assert.equal(building.focused, true);
+});
+
+test('saved planner cards use the existing edit and delete actions', () => {
+  const run = workspace();
+  const markup = run(`
+    s.data={schedules:[{
+      id:"slot",roomId:"r",course:"Networks",days:[1],startTime:"08:00",endTime:"09:00"
+    }]};
+    plannerWeekMarkup("r");
+  `);
+  for (const action of ['edit-schedule', 'record-delete']) {
+    const links = markup.match(new RegExp('data-action="' + action + '" data-entity="schedules" data-id="slot"', 'g'));
+    assert.equal(links?.length, 2); // Desktop week and mobile day.
+  }
+  assert.doesNotMatch(run('s.data.demo=true; plannerWeekMarkup("r")'), /data-action="(?:edit-schedule|record-delete)"/);
+});
+
+test('room timetable shows current classes for the selected room without editing actions', () => {
+  const run = workspace();
+  const markup = run(`
+    s.user={role:"staff"};
+    s.data={buildings:[{id:"b",name:"North"}],rooms:[
+      {id:"r",buildingId:"b",roomNumber:"201",name:"Lab"},
+      {id:"other",buildingId:"b",roomNumber:"202",name:"Studio"}
+    ],schedules:[
+      {roomId:"r",course:"Networks",instructor:"Ada",section:"BSIT 3A",days:[1,3],startTime:"08:00",endTime:"09:00"},
+      {roomId:"r",course:"Paused class",active:false},
+      {roomId:"r",course:"Expired class",effectiveEnd:"2000-01-01"},
+      {roomId:"other",course:"Other room",days:[2],startTime:"10:00",endTime:"11:00"}
+    ]};
+    s.page="timetable"; pageContent();
+  `);
+  assert.match(markup, /201 · Lab weekly timetable/);
+  assert.equal(markup.match(/<strong>Networks<\/strong>/g)?.length, 2);
+  assert.doesNotMatch(markup, /Paused class|Expired class|Other room|edit-schedule|record-delete/);
+  assert.match(run('s.timetable.roomId="other"; timetablePage()'), /Other room/);
+  assert.equal(run('nav().some(item=>item[0]==="timetable")'), true);
+});
+
+test('replacement previews only the checked schedule and includes its version', async () => {
+  const input = { files: [{ name: 'swap.csv', text: async () =>
+    'building,room,instructor,course,days,startTime,endTime\nNorth,201,Ada,Networks,Mon,09:00,10:00' }] };
+  const submit = {};
+  const run = workspace({
+    '#schedule-file': input, '#confirm-import': submit, '#import-feedback': {}, '#import-preview': {},
+    '#dialog': { open: true },
+    '#replacement-schedules': { querySelectorAll: () => [{ value: 'selected', dataset: { updatedAt: '2026-11-18T00:00:00Z' } }] }
+  }, { input });
+  run('let request; api=async (url, options)=>{request=JSON.parse(options.body);return {errors:[]}}');
+  await run('readImport({target:input})');
+  assert.equal(run('JSON.stringify(request.replaceSelection)'), '[{"id":"selected","updated_at":"2026-11-18T00:00:00Z"}]');
+  assert.equal(run('request.preview'), true);
+  assert.equal(submit.textContent, 'Replace 1 with 1');
+  assert.equal(submit.disabled, false);
 });

@@ -26,6 +26,8 @@ The base project schema and client integration migration have already been appli
 
 After those migrations, apply [20261118120000_reconcile_rounds_and_staff_claims.sql](supabase/migrations/20261118120000_reconcile_rounds_and_staff_claims.sql) before deploying its matching frontend. It reconciles unfinished rounds with current schedules and releases claims held by inactive staff. Back up production and verify the migration on a disposable Supabase project first.
 
+Apply [20261118130000_replace_selected_schedules.sql](supabase/migrations/20261118130000_replace_selected_schedules.sql) before publishing the schedule replacement feature. In Schedule → Replace schedules, select only the old entries you want to change. Download the selection and edit it in Excel. Clear all entry cells on any row you want to drop. Upload and review the workbook. Saving archives the selection and adds the replacement rows together. Ordinary imports still only add rows.
+
 Confirm the first account has the `admin` role in `public.profiles`. The schema’s Auth trigger creates new accounts as `staff` by default.
 
 Deploy the Admin-only staff account function from this folder:
