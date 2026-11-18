@@ -189,3 +189,19 @@ test('import preview checks every row before allowing a save', async () => {
   assert.match(preview.innerHTML, /North \/ 201: 2/);
   assert.match(preview.innerHTML, /<td>4<\/td>.*Overlapping schedule/);
 });
+
+test('cancelling planner entry clears the draft and keeps the current location', async () => {
+  const app = { querySelectorAll: () => [] };
+  const building = { focus() { this.focused = true; } };
+  const button = { dataset: { action: 'cancel-planner-draft' }, form: { dataset: { pending: 'true' } } };
+  const run = workspace({ '#app': app, '[data-planner-building]': building }, { button });
+  run('Object.assign(s.schedulePlanner,{buildingId:"b",roomId:"r",drafts:[plannerDraft()]}); render=()=>{}; bind()');
+  const click = 'app.onclick({target:{closest:selector=>selector==="[data-action]"?button:null}})';
+  await run(click);
+  assert.equal(run('s.schedulePlanner.drafts.length'), 1);
+  delete button.form.dataset.pending;
+  await run(click);
+  assert.equal(run('s.schedulePlanner.drafts.length'), 0);
+  assert.equal(run('s.schedulePlanner.buildingId + "/" + s.schedulePlanner.roomId'), 'b/r');
+  assert.equal(building.focused, true);
+});

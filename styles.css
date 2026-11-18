@@ -601,6 +601,7 @@ button[aria-busy="true"]{cursor:progress}
 .planner-days-field{margin-top:12px}
 .planner-form-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--border)}
 .planner-form-foot .form-hint{max-width:60ch}
+.planner-form-actions{display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
 .planner-mobile-tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;padding:10px 12px;border-bottom:1px solid var(--border)}
 .planner-day-tab{min-height:38px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:550}
 .planner-day-tab.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--text)}
