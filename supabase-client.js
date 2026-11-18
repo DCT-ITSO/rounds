@@ -219,7 +219,7 @@
         laptopHdmi: row.personal_laptop_used || row.hdmi_connected ? 'yes' : row.personal_laptop_used === null ? 'unknown' : 'no',
         display: row.display_condition === 'not_checked' ? 'unknown' : row.display_condition,
         notes: row.notes || '',
-        photo: context.photos.get(row.id) || ''
+        photo: ''
       },
       schedule: {
         instructor: row.instructor_snapshot,
@@ -245,54 +245,50 @@
     };
   }
 
-  async function getSignedPhotos(roundIds) {
-    if (!roundIds.length) return new Map();
+  async function readRoundPhoto(id) {
     const result = await client.from('round_photos')
-      .select('round_id, storage_path, uploaded_at')
-      .in('round_id', roundIds)
-      .order('uploaded_at', { ascending: false });
-    const rows = result.error ? [] : result.data || [];
-    const photos = new Map();
-    const latestByRound = new Map();
-    for (const row of rows) {
-      if (!latestByRound.has(row.round_id)) latestByRound.set(row.round_id, row.storage_path);
-    }
-    const entries = [...latestByRound.entries()];
-    const batches = [];
-    for (let index = 0; index < entries.length; index += 100) {
-      batches.push(entries.slice(index, index + 100));
-    }
-    const signedBatches = await Promise.all(batches.map(batch =>
-      client.storage.from('round-photos').createSignedUrls(batch.map(([, storagePath]) => storagePath), 3600)
-    ));
-    signedBatches.forEach((signed, batchIndex) => {
-      if (signed.error) return;
-      const roundByPath = new Map();
-      for (const [roundId, storagePath] of batches[batchIndex]) {
-        const roundIdsForPath = roundByPath.get(storagePath) || [];
-        roundIdsForPath.push(roundId);
-        roundByPath.set(storagePath, roundIdsForPath);
-      }
-      for (const item of signed.data || []) {
-        if (item.signedUrl) {
-          for (const roundId of roundByPath.get(item.path) || []) photos.set(roundId, item.signedUrl);
-        }
-      }
-    });
-    return photos;
+      .select('storage_path')
+      .eq('round_id', id)
+      .order('uploaded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const photo = unwrap(result, 'Could not load the check photo.');
+    if (!photo) return '';
+    const signed = await client.storage.from('round-photos').createSignedUrl(photo.storage_path, 3600);
+    return unwrap(signed, 'Could not open the check photo.').signedUrl;
   }
 
-  async function loadState(date) {
+  async function loadOpenIssues(page, context) {
+    const pageSize = 25;
+    const rows = unwrap(await client.from('rounds')
+      .select('*, issues!inner(id, status, description)')
+      .eq('issues.status', 'open')
+      .order('scheduled_date', { ascending: false })
+      .order('id')
+      .range(page * pageSize, (page + 1) * pageSize), 'Could not load open issues.');
+    if (!rows.length && page > 0) return loadOpenIssues(0, context);
+    const issues = new Map(rows.map(row => [row.id, row.issues]));
+    return {
+      page,
+      hasMore: rows.length > pageSize,
+      rounds: rows.slice(0, pageSize).map(row => ({
+        ...toTask(row, { ...context, issues }),
+        openIssues: row.issues.map(issue => issue.description)
+      }))
+    };
+  }
+
+  async function loadState(date, issuePage) {
     const user = await readCurrentUser();
     if (!user) fail('Your session expired. Sign in again.');
 
-    unwrap(await client.rpc('ensure_rounds_for_date', { p_date: date }), 'Could not create the rounds for today.');
+    unwrap(await client.rpc('ensure_rounds_for_date', { p_date: date }).select('id').limit(1), 'Could not create the rounds for today.');
 
     const base = await Promise.all([
       client.from('buildings').select('*').order('name'),
       client.from('rooms').select('*').order('room_number'),
       client.from('schedules').select('*').order('start_time'),
-      client.from('rounds').select('*').eq('scheduled_date', date).order('scheduled_start'),
+      client.from('rounds').select('*').eq('scheduled_date', date).neq('status', 'cancelled').order('scheduled_start'),
       client.from('rounds').select('*').eq('status', 'completed').order('completed_at', { ascending: false }).limit(100),
       client.from('profile_directory').select('*').order('full_name'),
       client.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100)
@@ -335,8 +331,7 @@
       if (!issueMap.has(issue.round_id)) issueMap.set(issue.round_id, []);
       issueMap.get(issue.round_id).push(issue);
     }
-    const photos = await getSignedPhotos(roundIds);
-    const context = { buildings: buildingMap, rooms: roomMap, members, issues: issueMap, photos };
+    const context = { buildings: buildingMap, rooms: roomMap, members, issues: issueMap };
     const rounds = todayRows.map(row => toTask(row, context));
     const history = historyRows.map(row => toTask(row, context));
     const audit = activityRows.map(row => toAudit(row, members));
@@ -359,6 +354,7 @@
       schedules,
       rounds,
       history,
+      openIssues: issuePage === null ? null : await loadOpenIssues(issuePage, context),
       users: adminProfiles.map(toMember),
       audit,
       demo: false
@@ -381,7 +377,9 @@
     if (!days.length || days.some(day => !Number.isInteger(day) || day < 0 || day > 6)) {
       fail('Choose at least one valid weekday.');
     }
-    if (!payload.startTime || !payload.endTime || payload.startTime >= payload.endTime) {
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!time.test(payload.startTime) || !time.test(payload.endTime)) fail('Enter valid start and end times.');
+    if (payload.startTime >= payload.endTime) {
       fail('The schedule end time must be after its start time.');
     }
     if (!payload.roomId || !String(payload.instructor || '').trim() || !String(payload.course || '').trim()) {
@@ -569,7 +567,7 @@
       const building = lastState.buildings.find(item => item.active !== false && !item.archived && (item.name.toLowerCase() === String(row.building || '').trim().toLowerCase() || item.code.toLowerCase() === String(row.building || '').trim().toLowerCase()));
       const room = lastState.rooms.find(item => item.active !== false && !item.archived && item.buildingId === building?.id && item.roomNumber.toLowerCase() === String(row.room || '').trim().toLowerCase());
       if (!building || !room) {
-        errors.push({ row: index + 1, error: 'Building or room was not found.' });
+        errors.push({ row: Number.isInteger(row.sourceRow) ? row.sourceRow : index + 2, error: 'Building or room was not found.' });
         continue;
       }
       const payload = {
@@ -594,9 +592,10 @@
           active: true
         });
       } catch (error) {
-        errors.push({ row: index + 1, error: error.message });
+        errors.push({ row: Number.isInteger(row.sourceRow) ? row.sourceRow : index + 2, error: error.message });
       }
     }
+    if (body.preview === true) return { errors };
     if (errors.length) {
       const error = new Error('Fix the schedule rows before importing.');
       error.errors = errors;
@@ -719,7 +718,10 @@
     if (path === '/api/state' && method === 'GET') {
       const date = parsed.searchParams.get('date');
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) fail('A valid campus date is required.');
-      return loadState(date);
+      const page = parsed.searchParams.get('issuePage');
+      const issuePage = page === null ? null : Number(page);
+      if (issuePage !== null && (!Number.isSafeInteger(issuePage) || issuePage < 0)) fail('Invalid issue page.');
+      return loadState(date, issuePage);
     }
     if (path === '/api/buildings' && method === 'POST') {
       await requireAdmin();
@@ -810,8 +812,15 @@
     const roundMatch = path.match(/^\/api\/rounds\/([^/]+)$/);
     if (roundMatch && method === 'GET') {
       const id = decodeURIComponent(roundMatch[1]);
-      const round = [...(lastState?.rounds || []), ...(lastState?.history || [])].find(item => item.id === id);
-      if (round) return { round };
+      const round = [...(lastState?.rounds || []), ...(lastState?.history || []), ...(lastState?.openIssues?.rounds || [])].find(item => item.id === id);
+      if (round) {
+        try {
+          const photo = await readRoundPhoto(id);
+          return { round: { ...round, check: { ...round.check, photo } } };
+        } catch {
+          return { round, photoWarning: 'The room check photo could not be loaded.' };
+        }
+      }
       fail('This room check is not in the loaded history. Refresh the workspace and try again.');
     }
     fail('Unsupported Rounds request: ' + method + ' ' + path);

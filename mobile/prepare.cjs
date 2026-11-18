@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { isServiceRoleKey } = require('../scripts/supabase-key.cjs');
 
 const root = path.resolve(__dirname, '..');
 const webDir = path.join(__dirname, 'www');
@@ -20,18 +21,8 @@ const publishableKey = process.env.ROUNDS_SUPABASE_PUBLISHABLE_KEY || env.ROUNDS
 if (!supabaseUrl || !publishableKey) {
   throw new Error('Set ROUNDS_SUPABASE_URL and ROUNDS_SUPABASE_PUBLISHABLE_KEY in .env before building the Android app.');
 }
-if (/^sb_secret_/i.test(publishableKey)) {
-  throw new Error('A Supabase secret key cannot be included in an Android app. Use the publishable key.');
-}
-const keyPayload = publishableKey.split('.')[1];
-if (keyPayload) {
-  try {
-    if (JSON.parse(Buffer.from(keyPayload, 'base64url').toString('utf8')).role === 'service_role') {
-      throw new Error('A Supabase service-role key cannot be included in an Android app. Use the publishable key.');
-    }
-  } catch (error) {
-    if (/service-role key/.test(error.message)) throw error;
-  }
+if (isServiceRoleKey(publishableKey)) {
+  throw new Error('A Supabase secret or service-role key cannot be included in an Android app. Use the publishable key.');
 }
 
 fs.rmSync(webDir, { recursive: true, force: true });

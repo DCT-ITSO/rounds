@@ -603,9 +603,10 @@ const server = http.createServer(async (req, res) => {
             item.days.some((day) => candidate.days.includes(day)) && overlap(candidate.startTime, candidate.endTime, item.startTime, item.endTime));
           if (conflict) error = "Overlaps another schedule for this room.";
         }
-        if (error) errors.push({ row: index + 2, error });
+        if (error) errors.push({ row: Number.isInteger(row.sourceRow) ? row.sourceRow : index + 2, error });
         else prepared.push(candidate);
       });
+      if (body.preview === true) return json(res, 200, { errors });
       if (errors.length) return json(res, 400, { error: "Fix the rows listed before importing.", errors });
       store.schedules.push(...prepared);
       logAction("Schedules imported", prepared.length + " schedule rows", user);

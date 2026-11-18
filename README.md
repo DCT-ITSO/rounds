@@ -14,6 +14,7 @@ npm start
 ```
 
 Run the built-in regression tests with `npm test`.
+After applying the schema and migrations on a disposable Supabase project, run [the SQL regression checks](test/rounds-regression.sql) in the SQL Editor. The script rolls back its test data. Use two signed-in staff sessions on that project to check simultaneous claims and live updates before deploying.
 
 Use the Admin account created in Supabase Auth to sign in. Do not start the connected app with `node server.mjs`; that command starts the old local JSON prototype on port `4173`. It is separate from Supabase and is not used by Electron.
 
@@ -22,6 +23,8 @@ Use the Admin account created in Supabase Auth to sign in. Do not start the conn
 The project URL and publishable key are read from the ignored `.env` file. The key is a client-side publishable key; database access is controlled by Row Level Security. Never put a Supabase secret or service-role key in `.env`, Electron, or renderer code.
 
 The base project schema and client integration migration have already been applied. Run [20261115120000_admin_data_management.sql](supabase/migrations/20261115120000_admin_data_management.sql), [20261115130000_limit_round_generation_to_today.sql](supabase/migrations/20261115130000_limit_round_generation_to_today.sql), and [20261116120000_prevent_schedule_overlaps.sql](supabase/migrations/20261116120000_prevent_schedule_overlaps.sql) once each in Supabase Dashboard > SQL Editor. The first adds archive states, safe staff account management, audit entries for Admin data changes, and Realtime updates for workspace activity. The second prevents authenticated clients from generating round records for arbitrary dates. The third blocks overlapping active schedules in the database, including concurrent writes; it reports existing overlaps without changing those records.
+
+After those migrations, apply [20261118120000_reconcile_rounds_and_staff_claims.sql](supabase/migrations/20261118120000_reconcile_rounds_and_staff_claims.sql) before deploying its matching frontend. It reconciles unfinished rounds with current schedules and releases claims held by inactive staff. Back up production and verify the migration on a disposable Supabase project first.
 
 Confirm the first account has the `admin` role in `public.profiles`. The schema’s Auth trigger creates new accounts as `staff` by default.
 

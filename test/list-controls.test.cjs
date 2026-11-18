@@ -32,5 +32,6 @@ test('list controls store their value under the rendered list ID', () => {
   assert.equal(rendered, true);
   assert.equal(selector, '[data-list-control="schedules"][data-key="state"]');
   assert.equal(control.focused, true);
-  assert.match(source, /app\.oninput=updateListControl;app\.onchange=updateListControl/);
+  assert.ok(/app\.oninput=e=>[^\r\n]+updateListControl\(e\)/.test(source), 'input delegates to list controls');
+  assert.ok(/app\.onchange=e=>[^\r\n]+updateListControl\(e\)/.test(source), 'change delegates to list controls');
 });
